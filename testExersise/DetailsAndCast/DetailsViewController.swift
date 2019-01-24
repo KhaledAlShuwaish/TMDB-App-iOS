@@ -1,0 +1,223 @@
+//
+//  DetailsViewController.swift
+//  testExersise
+//
+//  Created by Khaled Shuwaish on 19/01/2019.
+//  Copyright © 2019 Khaled Shuwaish. All rights reserved.
+//
+
+import UIKit
+import Alamofire
+import AlamofireImage
+import SwiftyJSON
+
+class DetailsViewController: UIViewController , UICollectionViewDelegate , UICollectionViewDataSource {
+    @IBOutlet weak var CastCollection: UICollectionView!
+    var CastDetails = [Cast]()
+    var MoviewDetails :Movie!
+    var ArrayOfGeners = [Gener]()
+    var islogin = false
+    @IBOutlet weak var Favorite: UIButton!
+    var  IMDb_id : String = " "
+    var movei_ID = 0
+    @IBOutlet weak var Geners: UILabel!
+    @IBOutlet weak var VotoAvrage: UILabel!
+    
+    @IBOutlet weak var Overview: UILabel?
+    @IBOutlet weak var MoviewImage: UIImageView?
+    @IBOutlet weak var MovieTitle: UILabel?
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        UserDefaults.standard.bool(forKey: "Log-in")
+        UserDefaults.standard.set(false, forKey: "Log-in")
+        GenerRequest()
+        DetailsRequest()
+        CastRequest()
+     }
+    
+    func DetailsRequest(){
+        URLSession.shared.dataTask(with: URL(string: "https://api.themoviedb.org/3/movie/\(MoviewDetails.id)?api_key=54d967b50f9705aa762c1ebbd833a254&language=en-US")!) { (data, response, error) in
+            do {
+                let list = try JSONDecoder().decode(Details.self, from: data!)
+                DispatchQueue.main.async(execute: {
+                    self.Overview?.text = list.overview
+                    self.MovieTitle?.text = list.title
+                    self.VotoAvrage?.text = "\(list.vote_average)"
+                    self.IMDb_id = list.imdb_id
+                    self.movei_ID = list.id
+                })
+            } catch {
+                print(error)
+            } }.resume()
+    }
+    
+    func GenerRequest(){
+        URLSession.shared.dataTask(with: URL(string:"https://api.themoviedb.org/3/genre/movie/list?api_key=54d967b50f9705aa762c1ebbd833a254&language=en-US")!) { (data, response, error) in
+            do {
+                let list = try JSONDecoder().decode(MyGener.self, from: data!)
+                self.ArrayOfGeners.append(contentsOf: list.genres)
+                DispatchQueue.main.async {
+                    var NewGener_id = " "
+                    var Count = 0
+                    while Count < self.ArrayOfGeners.count {
+                        if self.MoviewDetails.genre_ids.contains(self.ArrayOfGeners[Count].id){
+                            NewGener_id.append(contentsOf: "\(self.ArrayOfGeners[Count].name)   ")
+                        }
+                        Count = Count + 1
+                    }
+                    self.Geners.text = NewGener_id
+                }
+            } catch {
+                print(error)
+            }
+            }.resume()
+    }
+    
+    @IBAction func SimilerButtonAction(_ sender: Any) {
+        let SimilerViewController = self.storyboard?.instantiateViewController(withIdentifier: "SimilarTableViewController") as! SimilarTableViewController
+            SimilerViewController.MovieDetails = self.MoviewDetails
+            self.navigationController?.pushViewController(SimilerViewController, animated: true)
+    }
+    
+    func CastRequest(){
+        URLSession.shared.dataTask(with: URL(string: "https://api.themoviedb.org/3/movie/\(MoviewDetails.id)/credits?api_key=54d967b50f9705aa762c1ebbd833a254")!) { (data, response, error) in
+            do {
+                let list = try JSONDecoder().decode(MyCast.self, from: data!)
+                self.CastDetails.append(contentsOf: list.cast)
+                DispatchQueue.main.async {
+                self.CastCollection.reloadData()
+                }
+            } catch {
+                print(error)
+            }
+            }.resume()
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        return CastDetails.count
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "Cell", for: indexPath) as! CastCollectionViewCell
+        cell.CastActorName?.text = CastDetails[(indexPath as NSIndexPath).row].name
+
+        if let NewPosterPath = CastDetails[(indexPath as NSIndexPath).row].profile_path {
+            ImageRequestForCell(cellForRowAt: indexPath, cell: cell , URL: NewPosterPath)
+        } else {
+            cell.CastActorImage?.image  = UIImage(named: "EmptyPerson")
+        }
+        return cell
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        let ActorDetailsViewController = self.storyboard?.instantiateViewController(withIdentifier: "ActorDetailsViewController") as! ActorDetailsViewController
+        ActorDetailsViewController.ActorDetails = self.CastDetails[indexPath.row]
+        if let NewPosterPath = CastDetails[(indexPath as NSIndexPath).row].profile_path {
+            ImageRequestForVC(cellForRowAt: indexPath, VC: ActorDetailsViewController, URL: NewPosterPath)
+        } else {
+            ActorDetailsViewController.ActorImage?.image  = UIImage(named: "EmptyPerson")
+        }
+        self.navigationController?.pushViewController(ActorDetailsViewController, animated: true)
+    }
+    
+    
+    func ImageRequestForCell(cellForRowAt indexPath: IndexPath ,cell : CastCollectionViewCell , URL : String) {
+          let PosterPath = ("https://image.tmdb.org/t/p/w500/" + URL) as URLConvertible
+        Alamofire.request(PosterPath).responseImage { response  in
+            if let image = response.result.value {
+                                  cell.CastActorImage?.image = image
+            }
+        }
+    }
+    
+    func ImageRequestForVC(cellForRowAt indexPath: IndexPath ,VC : ActorDetailsViewController , URL : String) {
+        let PosterPath = ("https://image.tmdb.org/t/p/w500/" + URL) as URLConvertible
+        Alamofire.request(PosterPath).responseImage { response  in
+            if let image = response.result.value {
+                VC.ActorImage?.image = image
+            }
+        }
+    }
+    
+    
+    @IBAction func ShareResultToIMBD(_ sender: Any) {
+        let MyWebSite = NSURL(string:"https://www.imdb.com/title/\(IMDb_id)")
+        let shareURL = [MyWebSite]
+         let activityViewController = UIActivityViewController.init(activityItems: shareURL, applicationActivities: nil)
+        activityViewController.popoverPresentationController?.sourceView = self.view
+        self.present(activityViewController, animated: true, completion: nil)
+    }
+    
+    
+    func IfLogIn() -> Bool {
+        let defult = UserDefaults.standard
+        var login = defult.bool(forKey: "Log-in")
+        islogin = login
+        if islogin == false {
+            let vcc = self.storyboard?.instantiateViewController(withIdentifier: "FavouriteViewController") as! FavouriteViewController
+            self.present(vcc, animated: true, completion: nil)
+            return true
+        } else{
+            return true
+
+        }
+    }
+    func RequestFavourite(Movie_ID : Int , isfavorite: Bool , addOrRemove: String)  {
+        
+        if !IfLogIn() == false {
+            print("Sooory")
+        }
+        
+        let defult = UserDefaults.standard
+        let parameters = ["media_type": "movie", "media_id": Movie_ID , "favorite" : isfavorite] as [String : Any]
+        let url = URL(string: "https://api.themoviedb.org/3/account/\(defult.integer(forKey: "AccountID"))/favorite?api_key=54d967b50f9705aa762c1ebbd833a254&session_id=\(defult.object(forKey: "session_id")as! String)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: parameters, options: .prettyPrinted) // pass dictionary to nsdata object and set it as request body
+        } catch let error {
+            print(error.localizedDescription)
+        }
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("application/json", forHTTPHeaderField: "Accept")
+        let task = URLSession.shared.dataTask(with: request as URLRequest, completionHandler: { data, response, error in
+            
+            do {
+                //create json object from data
+                if let jsonResult = try JSONSerialization.jsonObject(with: data!, options: .mutableContainers) as? [String: Any] {
+                    print(jsonResult)
+                    let json        = JSON(jsonResult)
+                    var status_code = json["status_code"]
+                    switch status_code {
+                    case 1 :
+                        self.alert(text: "The movie has been \(addOrRemove)d to your favorites")
+                    case 12 :
+                        self.alert(text: "The movie is already \(addOrRemove)d in your favorites")
+                    default:
+                        self.alert(text: "The movie has not been \(addOrRemove)d to your favorites")
+                    }
+                }
+            } catch let error {
+                print(error.localizedDescription)
+            }
+        })
+        task.resume()
+        
+    }
+    @IBAction func AddToFavourite(_ sender: Any) {
+      
+        RequestFavourite(Movie_ID: movei_ID, isfavorite: true, addOrRemove: "add")
+        }
+ 
+    @IBAction func RemoveFavourite(_ sender: Any) {
+        RequestFavourite(Movie_ID: movei_ID, isfavorite: false, addOrRemove: "remove")
+    }
+    
+    func alert(text : String)  {
+        let alert = UIAlertController(title: "", message: text, preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: "Ok", style: .cancel, handler: nil))
+                self.present(alert, animated: true, completion: nil)
+    }
+
+}
