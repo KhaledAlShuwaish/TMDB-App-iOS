@@ -17,7 +17,7 @@ class DetailsViewController: UIViewController , UICollectionViewDelegate , UICol
     var MoviewDetails :Movie!
     var ArrayOfGeners = [Gener]()
     var islogin = false
-    @IBOutlet weak var Favorite: UIButton!
+//    @IBOutlet weak var Favorite: UIButton!
     var  IMDb_id : String = " "
     var movei_ID = 0
     @IBOutlet weak var Geners: UILabel!
@@ -150,74 +150,5 @@ class DetailsViewController: UIViewController , UICollectionViewDelegate , UICol
     }
     
     
-    func IfLogIn() -> Bool {
-        let defult = UserDefaults.standard
-        var login = defult.bool(forKey: "Log-in")
-        islogin = login
-        if islogin == false {
-            let vcc = self.storyboard?.instantiateViewController(withIdentifier: "FavouriteViewController") as! FavouriteViewController
-            self.present(vcc, animated: true, completion: nil)
-            return true
-        } else{
-            return true
-
-        }
-    }
-    func RequestFavourite(Movie_ID : Int , isfavorite: Bool , addOrRemove: String)  {
-        
-        if !IfLogIn() == false {
-            print("Sooory")
-        }
-        
-        let defult = UserDefaults.standard
-        let parameters = ["media_type": "movie", "media_id": Movie_ID , "favorite" : isfavorite] as [String : Any]
-        let url = URL(string: "https://api.themoviedb.org/3/account/\(defult.integer(forKey: "AccountID"))/favorite?api_key=54d967b50f9705aa762c1ebbd833a254&session_id=\(defult.object(forKey: "session_id")as! String)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: parameters, options: .prettyPrinted) // pass dictionary to nsdata object and set it as request body
-        } catch let error {
-            print(error.localizedDescription)
-        }
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue("application/json", forHTTPHeaderField: "Accept")
-        let task = URLSession.shared.dataTask(with: request as URLRequest, completionHandler: { data, response, error in
-            
-            do {
-                //create json object from data
-                if let jsonResult = try JSONSerialization.jsonObject(with: data!, options: .mutableContainers) as? [String: Any] {
-                    print(jsonResult)
-                    let json        = JSON(jsonResult)
-                    var status_code = json["status_code"]
-                    switch status_code {
-                    case 1 :
-                        self.alert(text: "The movie has been \(addOrRemove)d to your favorites")
-                    case 12 :
-                        self.alert(text: "The movie is already \(addOrRemove)d in your favorites")
-                    default:
-                        self.alert(text: "The movie has not been \(addOrRemove)d to your favorites")
-                    }
-                }
-            } catch let error {
-                print(error.localizedDescription)
-            }
-        })
-        task.resume()
-        
-    }
-    @IBAction func AddToFavourite(_ sender: Any) {
-      
-        RequestFavourite(Movie_ID: movei_ID, isfavorite: true, addOrRemove: "add")
-        }
- 
-    @IBAction func RemoveFavourite(_ sender: Any) {
-        RequestFavourite(Movie_ID: movei_ID, isfavorite: false, addOrRemove: "remove")
-    }
-    
-    func alert(text : String)  {
-        let alert = UIAlertController(title: "", message: text, preferredStyle: .alert)
-                alert.addAction(UIAlertAction(title: "Ok", style: .cancel, handler: nil))
-                self.present(alert, animated: true, completion: nil)
-    }
 
 }
